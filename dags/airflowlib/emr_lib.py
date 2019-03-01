@@ -10,10 +10,11 @@ def client(region_name):
     global emr
     emr = boto3.client('emr', region_name=region_name)
 
-def get_security_group_id(group_name, region_name):
-    ec2 = boto3.client('ec2', region_name=region_name)
-    response = ec2.describe_security_groups(GroupNames=[group_name])
-    return response['SecurityGroups'][0]['GroupId']
+def get_security_group_id(group_name, _region_name):
+    client = boto3.client('cloudformation')
+    response = client.describe_stacks(StackName='<STACK_NAME>')
+    return filter(lambda x: x.OutputKey == group_name, response['Stacks'][0]['Outputs'])[0].OutputValue
+
 
 def create_cluster(region_name, cluster_name='Airflow-' + str(datetime.now()), release_label='emr-5.9.0',master_instance_type='m3.xlarge', num_core_nodes=2, core_node_instance_type='m3.2xlarge'):
     emr_master_security_group_id = get_security_group_id('AirflowEMRMasterSG', region_name=region_name)

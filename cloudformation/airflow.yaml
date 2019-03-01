@@ -7,9 +7,11 @@ Parameters:
     Description: Name of an existing EC2 KeyPair to enable SSH access into the Airflow web server
     Type: AWS::EC2::KeyPair::KeyName
     ConstraintDescription: Must be the name of an existing EC2 KeyPair
+    Default: "spinnaker"
   S3BucketName:
     Description: REQUIRED - A new S3 Bucket name. This bucket will be used to read and write the Movielens dataset.
     Type: String
+    Default: "cb-eugene-test-airflow"
     AllowedPattern: '.+'
   DBPassword:
     Default: airflowpassword
@@ -20,6 +22,10 @@ Parameters:
     MaxLength: '41'
     AllowedPattern: '[a-zA-Z0-9]*'
     ConstraintDescription: Must contain only alphanumeric characters
+  VPC:
+    Description: 'VPC id.'
+    Type: AWS::EC2::VPC::Id
+    Default: "production"
 
 # Mapping to find the Amazon Linux AMI in each region.
 Mappings:
@@ -58,8 +64,17 @@ Resources:
   EC2Instance:
     Type: AWS::EC2::Instance
     Properties:
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet:
+            - !GetAtt AirflowEC2SecurityGroup.GroupId
+          SubnetId: "subnet-30955847"
       KeyName: !Ref 'KeyName'
-      SecurityGroups: [!Ref 'AirflowEC2SecurityGroup']
+      #SubnetId: "subnet-30955847"
+      #SecurityGroupIds:
+      #  - !GetAtt AirflowEC2SecurityGroup.GroupId
+      #[!Ref 'AirflowEC2SecurityGroup']
       InstanceType: 'm4.xlarge'
       IamInstanceProfile:
         Ref: EC2InstanceProfile
@@ -88,7 +103,7 @@ Resources:
          # Install git
          sudo yum install -y git
          # Clone the git repository
-         git clone https://github.com/aws-samples/aws-concurrent-data-orchestration-pipeline-emr-livy.git
+         git clone https://github.com/Eugst/aws-concurrent-data-orchestration-pipeline-emr-livy.git
          sudo pip install boto3
          # Install airflow using pip
          echo "Install Apache Airflow"
@@ -118,6 +133,8 @@ Resources:
          rm -rf aws-concurrent-data-orchestration-pipeline-emr-livy
          # Replace the name of the S3 bucket in each of the .scala files. CHANGE THE HIGHLIGHTED PORTION BELOW TO THE NAME OF THE S3 BUCKET YOU CREATED IN STEP 1. The below command replaces the instance of the string ‘<s3-bucket>’ in each of the scripts to the name of the actual bucket.
          sed -i 's/<s3-bucket>/${S3BucketName}/g' /root/airflow/dags/transform/*
+         # Replace stack name
+         sed -i 's/<STACK_NAME>/${AWS::StackName}/g' /root/airflow/dags/airflowlib/*
          # Run Airflow webserver
          airflow webserver
     Metadata:
@@ -132,7 +149,15 @@ Resources:
     DependsOn:
       - DBInstance
       - AirflowEC2SecurityGroup
+  DBSubnetGroup:
+    Type: "AWS::RDS::DBSubnetGroup"
+    Properties:
+      DBSubnetGroupDescription: "AirflowDbSubnet"
+      SubnetIds:
+        - "subnet-4d826d14"
+        - "subnet-30955847"
   DBInstance:
+    DependsOn: DBSecurityGroup
     Type: AWS::RDS::DBInstance
     DeletionPolicy: Delete
     Properties:
@@ -142,8 +167,9 @@ Resources:
       MasterUserPassword: !Ref 'DBPassword'
       DBInstanceClass: db.t2.small
       AllocatedStorage: 5
-      DBSecurityGroups:
-        - Ref: DBSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !GetAtt DBSecurityGroup.GroupId
   AirflowEC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -162,33 +188,43 @@ Resources:
           FromPort: 22
           ToPort: 22
           CidrIp: 0.0.0.0/0
+      VpcId: !Ref VPC
   AirflowEMRMasterEC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      VpcId: !Ref VPC
       GroupName: AirflowEMRMasterSG
       GroupDescription: Airflow EMR Master SG
     DependsOn:
       - AirflowEC2SecurityGroup
   AirflowEMRMasterInboundRule:
+    DependsOn: AirflowEMRMasterEC2SecurityGroup
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
       IpProtocol: tcp
       FromPort: '8998'
       ToPort: '8998'
-      SourceSecurityGroupName: !Ref 'AirflowEC2SecurityGroup'
-      GroupName: !Ref 'AirflowEMRMasterEC2SecurityGroup'
+      SourceSecurityGroupId: !GetAtt AirflowEC2SecurityGroup.GroupId
+      GroupId: !GetAtt AirflowEMRMasterEC2SecurityGroup.GroupId #!Ref 'AirflowEMRMasterEC2SecurityGroup'
   AirflowEMRSlaveEC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
+      VpcId: !Ref VPC
       GroupName: AirflowEMRSlaveSG
       GroupDescription: Airflow EMR Slave SG
   DBSecurityGroup:
-    Type: AWS::RDS::DBSecurityGroup
+    DependsOn: AirflowEC2SecurityGroup
+    Type: AWS::EC2::SecurityGroup
     Properties:
+      VpcId: !Ref VPC
       GroupDescription: Frontend Access
-      DBSecurityGroupIngress:
-        EC2SecurityGroupName:
-          Ref: AirflowEC2SecurityGroup
+      SecurityGroupIngress:
+        -
+          IpProtocol: "tcp"
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !GetAtt AirflowEC2SecurityGroup.GroupId
+          #Ref: AirflowEC2SecurityGroup
   EC2Role:
     Type: AWS::IAM::Role
     Properties:
@@ -265,3 +301,7 @@ Outputs:
   AirflowEC2PublicDNSName:
     Description: Public DNS Name of the Airflow EC2 instance
     Value: !Join ["", ["http://", !GetAtt EC2Instance.PublicDnsName, ":8080"]]
+  AirflowEMRMasterSG:
+    Value: !GetAtt AirflowEMRMasterEC2SecurityGroup.GroupId
+  AirflowEMRSlaveSG:
+    Value: !GetAtt AirflowEMRSlaveEC2SecurityGroup.GroupId
