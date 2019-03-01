@@ -26,6 +26,8 @@ Parameters:
     Description: 'VPC id.'
     Type: AWS::EC2::VPC::Id
     Default: "production"
+  Version:
+    Type: String
 
 # Mapping to find the Amazon Linux AMI in each region.
 Mappings:
@@ -135,6 +137,7 @@ Resources:
          sed -i 's/<s3-bucket>/${S3BucketName}/g' /root/airflow/dags/transform/*
          # Replace stack name
          sed -i 's/<STACK_NAME>/${AWS::StackName}/g' /root/airflow/dags/airflowlib/*
+         print ${Version}
          # Run Airflow webserver
          airflow webserver
     Metadata:
