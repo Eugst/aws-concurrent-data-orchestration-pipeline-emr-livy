@@ -63,7 +63,7 @@ Mappings:
     ap-northeast-2:
       AMI: ami-863090e8
 Resources:
-  EC2Instance:
+  EC2Instance2:
     Type: AWS::EC2::Instance
     Properties:
       NetworkInterfaces:
@@ -245,6 +245,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
         - arn:aws:iam::aws:policy/AmazonElasticMapReduceFullAccess
+        - arn:aws:iam::aws:policy/AWSCloudFormationReadOnlyAccess
   EC2InstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
@@ -303,7 +304,7 @@ Resources:
 Outputs:
   AirflowEC2PublicDNSName:
     Description: Public DNS Name of the Airflow EC2 instance
-    Value: !Join ["", ["http://", !GetAtt EC2Instance.PublicDnsName, ":8080"]]
+    Value: !Join ["", ["http://", !GetAtt EC2Instance2.PublicDnsName, ":8080"]]
   AirflowEMRMasterSG:
     Value: !GetAtt AirflowEMRMasterEC2SecurityGroup.GroupId
   AirflowEMRSlaveSG:
