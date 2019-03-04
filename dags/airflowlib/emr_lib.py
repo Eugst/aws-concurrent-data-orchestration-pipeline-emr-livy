@@ -13,7 +13,7 @@ def client(region_name):
 def get_security_group_id(group_name, region_name):
     client = boto3.client('cloudformation', region_name=region_name)
     response = client.describe_stacks(StackName='<STACK_NAME>')
-    return filter(lambda x: x.OutputKey == group_name, response['Stacks'][0]['Outputs'])[0].OutputValue
+    return filter(lambda x: x['OutputKey'] == group_name, response['Stacks'][0]['Outputs'])[0]['OutputValue']
 
 
 def create_cluster(region_name, cluster_name='Airflow-' + str(datetime.now()), release_label='emr-5.9.0',master_instance_type='m3.xlarge', num_core_nodes=2, core_node_instance_type='m3.2xlarge'):
