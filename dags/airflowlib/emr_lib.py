@@ -11,10 +11,13 @@ def client(region_name):
     emr = boto3.client('emr', region_name=region_name)
 
 def get_security_group_id(group_name, region_name):
+    global cloudformation
     client = boto3.client('cloudformation', region_name=region_name)
-    response = client.describe_stacks(StackName='<STACK_NAME>')
-    return filter(lambda x: x['OutputKey'] == group_name, response['Stacks'][0]['Outputs'])[0]['OutputValue']
+    cloudformation = client.describe_stacks(StackName='<STACK_NAME>')
+    return filter(lambda x: x['OutputKey'] == group_name, cloudformation['Stacks'][0]['Outputs'])[0]['OutputValue']
 
+def get_key_name():
+    return filter(lambda x: x['OutputKey'] == 'SSHKey', cloudformation['Stacks'][0]['Outputs'])[0]['OutputValue']
 
 def create_cluster(region_name, cluster_name='Airflow-' + str(datetime.now()), release_label='emr-5.9.0',master_instance_type='m3.xlarge', num_core_nodes=2, core_node_instance_type='m3.2xlarge'):
     emr_master_security_group_id = get_security_group_id('AirflowEMRMasterSG', region_name=region_name)
@@ -40,7 +43,7 @@ def create_cluster(region_name, cluster_name='Airflow-' + str(datetime.now()), r
                 }
             ],
             'KeepJobFlowAliveWhenNoSteps': True,
-            'Ec2KeyName' : 'airflow_key_pair',
+            'Ec2KeyName' : get_key_name(),
             'EmrManagedMasterSecurityGroup': emr_master_security_group_id,
             'EmrManagedSlaveSecurityGroup': emr_slave_security_group_id
         },

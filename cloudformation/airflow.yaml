@@ -63,7 +63,7 @@ Mappings:
     ap-northeast-2:
       AMI: ami-863090e8
 Resources:
-  EC2Instance2:
+  EC2Instance:
     Type: AWS::EC2::Instance
     Properties:
       NetworkInterfaces:
@@ -137,6 +137,8 @@ Resources:
          sed -i 's/<s3-bucket>/${S3BucketName}/g' /root/airflow/dags/transform/*
          # Replace stack name
          sed -i 's/<STACK_NAME>/${AWS::StackName}/g' /root/airflow/dags/airflowlib/*
+         # Replace endpoint
+         sed -i "s/localhost\:8080/`curl http://169.254.169.254/latest/meta-data/public-hostname`:8080/g" /root/airflow/airflow.cfg
          print ${Version}
          # Run Airflow webserver
          airflow webserver
@@ -195,8 +197,8 @@ Resources:
   AirflowEMRMasterEC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      VpcId: !Ref VPC
-      GroupName: AirflowEMRMasterSG
+      #VpcId: !Ref VPC
+      #GroupName: AirflowEMRMasterSG
       GroupDescription: Airflow EMR Master SG
     DependsOn:
       - AirflowEC2SecurityGroup
@@ -207,13 +209,14 @@ Resources:
       IpProtocol: tcp
       FromPort: '8998'
       ToPort: '8998'
-      SourceSecurityGroupId: !GetAtt AirflowEC2SecurityGroup.GroupId
+      #SourceSecurityGroupId: !GetAtt AirflowEC2SecurityGroup.GroupId
+      CidrIp: 0.0.0.0/0
       GroupId: !GetAtt AirflowEMRMasterEC2SecurityGroup.GroupId #!Ref 'AirflowEMRMasterEC2SecurityGroup'
   AirflowEMRSlaveEC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      VpcId: !Ref VPC
-      GroupName: AirflowEMRSlaveSG
+      #VpcId: !Ref VPC
+      #GroupName: AirflowEMRSlaveSG
       GroupDescription: Airflow EMR Slave SG
   DBSecurityGroup:
     DependsOn: AirflowEC2SecurityGroup
@@ -304,8 +307,10 @@ Resources:
 Outputs:
   AirflowEC2PublicDNSName:
     Description: Public DNS Name of the Airflow EC2 instance
-    Value: !Join ["", ["http://", !GetAtt EC2Instance2.PublicDnsName, ":8080"]]
+    Value: !Join ["", ["http://", !GetAtt EC2Instance.PublicDnsName, ":8080"]]
   AirflowEMRMasterSG:
     Value: !GetAtt AirflowEMRMasterEC2SecurityGroup.GroupId
   AirflowEMRSlaveSG:
     Value: !GetAtt AirflowEMRSlaveEC2SecurityGroup.GroupId
+  SSHKey:
+    Value: !Ref KeyName
