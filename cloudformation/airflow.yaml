@@ -210,7 +210,6 @@ Resources:
       FromPort: '8998'
       ToPort: '8998'
       SourceSecurityGroupId: !GetAtt AirflowEC2SecurityGroup.GroupId
-      CidrIp: 0.0.0.0/0
       GroupId: !GetAtt AirflowEMRMasterEC2SecurityGroup.GroupId #!Ref 'AirflowEMRMasterEC2SecurityGroup'
   AirflowEMRSlaveEC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
