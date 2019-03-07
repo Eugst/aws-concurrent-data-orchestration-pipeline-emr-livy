@@ -43,6 +43,7 @@ def create_cluster(region_name, cluster_name='Airflow-' + str(datetime.now()), r
                 }
             ],
             'KeepJobFlowAliveWhenNoSteps': True,
+            'Ec2SubnetId': 'subnet-0b74ce40',
             'Ec2KeyName' : get_key_name(),
             'EmrManagedMasterSecurityGroup': emr_master_security_group_id,
             'EmrManagedSlaveSecurityGroup': emr_slave_security_group_id
